@@ -1,9 +1,11 @@
-import iam = require('@aws-cdk/aws-iam');
-import kms = require('@aws-cdk/aws-kms');
-import lambda = require('@aws-cdk/aws-lambda');
-import cdk = require('@aws-cdk/core');
-import * as statement from 'cdk-iam-floyd';
+import iam = require('aws-cdk-lib/aws-iam');
+import kms = require('aws-cdk-lib/aws-kms');
+import lambda = require('aws-cdk-lib/aws-lambda');
+import cdk = require('aws-cdk-lib');
 import path = require('path');
+import {Construct} from "constructs";
+import {Effect} from "aws-cdk-lib/aws-iam";
+import {Conditions} from "aws-cdk-lib/aws-iam/lib/policy-statement";
 
 const resourceType = 'Custom::EC2-Key-Pair';
 const ID = `CFN::Resource::${resourceType}`;
@@ -104,7 +106,7 @@ export interface KeyPairProps extends cdk.ResourceProps {
 /**
  * An EC2 Key Pair
  */
-export class KeyPair extends cdk.Construct implements cdk.ITaggable {
+export class KeyPair extends Construct implements cdk.ITaggable {
   /**
    * The lambda function that is created
    */
@@ -147,7 +149,7 @@ export class KeyPair extends cdk.Construct implements cdk.ITaggable {
   /**
    * Defines a new EC2 Key Pair. The private key will be stored in AWS Secrets Manager
    */
-  constructor(scope: cdk.Construct, id: string, props: KeyPairProps) {
+  constructor(scope: Construct, id: string, props: KeyPairProps) {
     super(scope, id);
 
     if (
@@ -230,44 +232,63 @@ export class KeyPair extends cdk.Construct implements cdk.ITaggable {
       return existing as lambda.Function;
     }
 
-    const policy = new iam.ManagedPolicy(stack, 'EC2-Key-Pair-Manager-Policy', {
+    const statementDescribeKeys = new iam.PolicyStatement({
+        actions: ["ec2:DescribeKeyPairs"],
+        effect:Effect.ALLOW
+    });
+
+    const statementCreationCreatedByTag = new iam.PolicyStatement({
+        actions: ["ec2:CreateKeyPair","ec2:CreateTags"],
+        effect:Effect.ALLOW,
+        resources: [`arn:${ stack.partition || 'aws' }:ec2:*:*:key-pair/*`]
+    });
+    const statementCreationCreatedByTagCondition:Conditions = {};
+    statementCreationCreatedByTagCondition[`ec2:aws:RequestTag/${createdByTag}`] = ID;
+    statementCreationCreatedByTag.addConditions({ "StringLike": statementCreationCreatedByTagCondition });
+
+    const statementDeleteUpdateCreatedByTag = new iam.PolicyStatement({
+        actions: ["ec2:CreateKeyPair","ec2:DeleteKeyPair","ec2:CreateTags","ec2:DeleteTags"],
+        effect:Effect.ALLOW,
+        resources: [`arn:${ stack.partition || 'aws' }:ec2:*:*:key-pair/*`]
+    });
+    const statementDeleteUpdateCreatedByTagCondition:Conditions = {};
+    statementDeleteUpdateCreatedByTagCondition[`ec2:aws:ResourceTag/${createdByTag}`] = ID;
+    statementDeleteUpdateCreatedByTag.addConditions({ "StringLike": statementDeleteUpdateCreatedByTagCondition });
+
+
+      const statementListSecrets = new iam.PolicyStatement({
+          actions: ["secretsmanager:ListSecrets"],
+          effect: Effect.ALLOW
+      });
+
+
+      const statementCreationSecrets = new iam.PolicyStatement({
+          actions: ["secretsmanager:CreateSecret","secretsmanager:TagResource"],
+          effect:Effect.ALLOW,
+      });
+      const statementCreationSecretsRequestTagCondition:Conditions = {};
+      statementCreationSecretsRequestTagCondition[`secretsmanager:aws:RequestTag/${createdByTag}`] = ID;
+      statementCreationSecrets.addConditions({ "StringLike": statementCreationSecretsRequestTagCondition });
+
+      const statementDeleteUpdateSecrets = new iam.PolicyStatement({
+          actions: ["secretsmanager:GetSecretValue","secretsmanager:GetResourcePolicy",
+              "secretsmanager:RestoreSecret", "secretsmanager:ListSecretVersionIds",
+              "secretsmanager:UntagResource", "secretsmanager:DescribeSecret", "secretsmanager:DeleteResourcePolicy"
+              , "secretsmanager:PutSecretValue", "secretsmanager:PutResourcePolicy",
+              "secretsmanager:UpdateSecret", "secretsmanager:UpdateSecretVersionStage"],
+          effect:Effect.ALLOW,
+      });
+      const statementDeleteUpdateSecretsCondition:Conditions = {};
+      statementDeleteUpdateSecretsCondition[`secretsmanager:aws:RequestTag/${createdByTag}`] = ID;
+      statementDeleteUpdateSecrets.addConditions({ "StringLike": statementDeleteUpdateSecretsCondition });
+
+
+
+      const policy = new iam.ManagedPolicy(stack, 'EC2-Key-Pair-Manager-Policy', {
       managedPolicyName: `${this.prefix}-${cleanID}`,
       description: `Used by Lambda ${cleanID}, which is a custom CFN resource, managing EC2 Key Pairs`,
-      statements: [
-        new statement.Ec2() // generally allow to inspect key pairs
-          .allow()
-          .toDescribeKeyPairs(),
-        new statement.Ec2() // allow creation, only if createdByTag is set
-          .allow()
-          .toCreateKeyPair()
-          .toCreateTags()
-          .onKeyPair('*', undefined, undefined, stack.partition)
-          .ifAwsRequestTag(createdByTag, ID),
-        new statement.Ec2() // allow delete/update, only if createdByTag is set
-          .allow()
-          .toDeleteKeyPair()
-          .toCreateTags()
-          .toDeleteTags()
-          .onKeyPair('*', undefined, undefined, stack.partition)
-          .ifResourceTag(createdByTag, ID),
-        new statement.Secretsmanager() // generally allow to list secrets. we need this to check if a secret exists before attempting to delete it
-          .allow()
-          .toListSecrets(),
-        new statement.Secretsmanager() // allow creation, only if createdByTag is set
-          .allow()
-          .toCreateSecret()
-          .toTagResource()
-          .ifAwsRequestTag(createdByTag, ID),
-        new statement.Secretsmanager() // allow delete/update, only if createdByTag is set
-          .allow()
-          .allMatchingActions('/^(Describe|Delete|Put|Update)/')
-          .toGetSecretValue()
-          .toGetResourcePolicy()
-          .toRestoreSecret()
-          .toListSecretVersionIds()
-          .toUntagResource()
-          .ifResourceTag(createdByTag, ID),
-      ],
+      statements: [ statementDescribeKeys, statementCreationCreatedByTag, statementDeleteUpdateCreatedByTag,
+          statementListSecrets, statementCreationSecrets, statementDeleteUpdateSecrets ],
     });
 
     const role = new iam.Role(stack, 'EC2-Key-Pair-Manager-Role', {
