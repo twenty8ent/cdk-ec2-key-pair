@@ -8,7 +8,7 @@ import { TestStack } from '../lib/test-stack';
 const app = new cdk.App();
 new TestStack(app, 'EC2KeyPair', {
   env: {
-    account: process.env.CDK_DEFAULT_ACCOUNT,
-    region: process.env.CDK_DEFAULT_REGION,
+        account:"081849900880",
+    region: "ap-southeast-2",
   },
 });

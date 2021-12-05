@@ -1,33 +1,20 @@
 {
-  "name": "cdk-ec2-key-pair",
-  "description": "CDK Construct for managing EC2 key pairs",
-  "version": "0.0.0",
+  "name": "@twenty8/cdk-ec2-key-pair-aws-v2",
+  "description": "CDK Construct for managing EC2 key pairs AWS CDK v2 - forked from cdk-ec2-key-pair ",
+  "version": "0.0.1",
   "license": "Apache-2.0",
   "author": {
-    "name": "Daniel Schroeder",
-    "url": "https://www.udondan.com/",
-    "twitter": "udondan"
+    "name": "Daniel Schroeder - patched by jovan as temp"
   },
-  "awscdkio": {
-    "twitter": "udondan"
-  },
-  "homepage": "https://github.com/udondan/cdk-ec2-key-pair",
+  "homepage": "https://github.com/twenty8ent/cdk-ec2-key-pair",
   "repository": {
     "type": "git",
-    "url": "https://github.com/udondan/cdk-ec2-key-pair.git"
+    "url": "https://github.com/twenty8ent/cdk-ec2-key-pair.git"
   },
   "bugs": {
-    "url": "https://github.com/udondan/cdk-ec2-key-pair/issues"
+    "url": "https://github.com/twenty8ent/cdk-ec2-key-pair/issues"
   },
   "keywords": [
-    "aws",
-    "cdk",
-    "aws-cdk",
-    "aws-cdk-construct",
-    "ec2",
-    "ec2-key-pair",
-    "cloudformation",
-    "cloudformation-custom-resource"
   ],
   "stability": "stable",
   "main": "lib/index.js",
@@ -45,12 +32,8 @@
     "outdir": "dist",
     "targets": {
       "python": {
-        "distName": "cdk-ec2-key-pair",
-        "module": "cdk_ec2_key_pair"
-      },
-      "dotnet": {
-        "namespace": "CDK.EC2.KeyPair",
-        "packageId": "CDK.EC2.KeyPair"
+        "distName": "cdk-ec2-key-pair-aws-v2",
+        "module": "cdk-ec2-key-pair-aws-v2"
       }
     }
   },
@@ -62,11 +45,14 @@
     "jsii": "^1.16.0",
     "jsii-pacmak": "^1.16.0",
     "ts-node": "^9.1.1",
-    "typescript": "~4.1.3"
+    "typescript": "~4.1.3",
+    "constructs": "10.0.9"
   },
   "dependencies": {
+    "cdk-iam-floyd": "^0.301.0"
   },
   "peerDependencies": {
-    "aws-cdk-lib": "2.0.0"
+    "aws-cdk-lib": "2.0.0",
+    "constructs": "10.0.9"
   }
 }
